@@ -1,8 +1,15 @@
-import java.io.File
-
-@Suppress("MemberVisibilityCanBePrivate")
+/**
+ * This class encapsulates the task of reading bytes from an single Array.
+ *
+ * Normally the [data] field represents bytes that comes from some file that should be
+ * read.
+ */
 class BytesReader(private val data: IntArray) {
 
+  /**
+   * This field indicates the current offset that is being read.
+   * It is constantly updated as something is read, being a dynamic mark.
+   */
   var position = 0
 
   private val tmpBuffer = IntArray(4) { 0 }
@@ -11,6 +18,13 @@ class BytesReader(private val data: IntArray) {
     seek(customPosition)
     if (updateTmpBuffer(1)) return (tmpBuffer[0])
     return -1
+  }
+
+  fun readBoolean(customPosition: Int = position): Boolean {
+    seek(customPosition)
+    if (updateTmpBuffer(1))
+      return (tmpBuffer[0] == 1)
+    return false
   }
 
   fun read2Bytes(customPosition: Int = position): Int {
@@ -43,8 +57,16 @@ class BytesReader(private val data: IntArray) {
     return -1
   }
 
+  fun readString(stringLength: Int): String? {
+    if (position + stringLength > data.size) return null
+
+    var result = ""
+    data.slice(position..(position - 1 + stringLength)).forEach { result += Char(it) }
+    return result
+  }
+
   fun seek(nextPos: Int): Int {
-    if (nextPos < data.size) {
+    if (nextPos >= data.size) {
       return -1
     }
 
@@ -53,21 +75,64 @@ class BytesReader(private val data: IntArray) {
   }
 
   private fun updateTmpBuffer(nBytes: Int): Boolean {
-    if (position + nBytes >= data.size) return false
+    if (position + nBytes > data.size) return false
     repeat(nBytes) { tmpBuffer[it] = data[position + it] }
     position += nBytes
     return true
   }
 }
 
-fun main() {
-  val f = File("src/main/resources/test_file.mid")
-  val bytes = f.readBytes()
-  val reader = BytesReader(bytes.map { it.toInt() }.toIntArray())
-  val MThd =
-          "${reader.read1Byte().toChar()}" +
-          "${reader.read1Byte().toChar()}" +
-          "${reader.read1Byte().toChar()}" +
-          "${reader.read1Byte().toChar()}"
-  println(MThd)
+/**
+ * This class encapsulates the task of writing bytes to an single Array.
+ *
+ * Normally the [data] field represents bytes that should be recorded to an file.
+ */
+class BytesWriter {
+
+  private val data = mutableListOf<Int>()
+
+  fun write1Byte(value: Int) {
+    data += value
+  }
+
+  fun writeBoolean(value: Boolean) {
+    this.write1Byte(if (value) 1 else 0)
+  }
+
+  fun write2Bytes(value: Int) {
+    data += value shr 8
+    data += value and 0xff
+  }
+
+  fun write3Bytes(value: Int) {
+    data += ((value shr 16) and 0xff)
+    data += ((value shr 8) and 0xff)
+    data += ((value shr 0) and 0xff)
+  }
+
+  fun write4Bytes(value: Long) {
+    data += ((value shr 24) and 0xff).toInt()
+    data += ((value shr 16) and 0xff).toInt()
+    data += ((value shr 8) and 0xff).toInt()
+    data += ((value shr 0) and 0xff).toInt()
+  }
+
+  fun writeString(value: String) {
+    value.toCharArray().forEach {
+      write1Byte(it.code)
+    }
+  }
+
+  fun getData() = data.toIntArray()
+
+  override fun toString(): String {
+    var res = ""
+    data.forEachIndexed { index, i ->
+      res += "0x${Integer.toHexString(i).padStart(2, '0')} "
+      if ((index + 1) % 10 == 0) {
+        res += "\n"
+      }
+    }
+    return res
+  }
 }
